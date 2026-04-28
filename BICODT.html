@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Опрос качества — Адванта-М Сибирь</title>
+    <style>
+        :root {
+            --primary-blue: #0b5fa5;
+            --deep-blue: #083d6e;
+            --accent-green: #2e7d32;
+            --bg-color: #eef3f9;
+            --white: #ffffff;
+            --text-color: #1a2b3c;
+            --text-light: #5a6b7a;
+            --border-color: #d0dbe8;
+            --shadow: 0 12px 28px rgba(0, 40, 80, 0.08);
+            --radius: 14px;
+            --transition: 0.25s ease;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+            background: linear-gradient(160deg, #e9f0f7 0%, #dce6f1 40%, #f4f7fb 100%);
+            margin: 0; display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 20px; color: var(--text-color);
+        }
+        /* Модальное окно */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; justify-content: center;
+            align-items: center; z-index: 1000; backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background: white; padding: 36px 32px; border-radius: var(--radius);
+            max-width: 480px; width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+            text-align: left; animation: fadeSlide 0.3s ease;
+        }
+        .modal-content h2 { color: var(--deep-blue); margin: 0 0 12px; }
+        .modal-text {
+            font-size: 14px; line-height: 1.6; color: var(--text-color);
+            max-height: 300px; overflow-y: auto; margin: 16px 0;
+            padding-right: 8px;
+        }
+        .modal-text p { margin: 8px 0; }
+        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+        .btn-accept {
+            background: var(--primary-blue); color: white; border: none;
+            padding: 12px 24px; border-radius: 10px; font-weight: 600; cursor: pointer;
+        }
+        .btn-accept:hover { background: #094a80; }
+        .btn-reject {
+            background: #eee; color: #666; border: none; padding: 12px 24px;
+            border-radius: 10px; font-weight: 600; cursor: pointer;
+        }
+        .btn-reject:hover { background: #ddd; }
+        .survey-container {
+            background: var(--white); width: 100%; max-width: 650px;
+            padding: 36px 32px 32px; border-radius: var(--radius);
+            box-shadow: var(--shadow); position: relative; overflow: hidden;
+            border: 1px solid rgba(11, 95, 165, 0.08);
+            display: none; /* скрыт до согласия */
+        }
+        .survey-container.visible { display: block; }
+        .brand-stripe {
+            position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: linear-gradient(90deg, var(--primary-blue) 0%, #1976d2 45%, var(--accent-green) 75%, #43a047 100%);
+        }
+        .progress-wrap { margin: 12px 0 28px; height: 6px; background: #e3eaf2; border-radius: 10px; overflow: hidden; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary-blue), var(--accent-green)); width: 25%; transition: width 0.5s; border-radius: 10px; }
+        .step { display: none; animation: fadeSlide 0.45s ease forwards; }
+        .step.active { display: block; }
+        @keyframes fadeSlide { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        h2 { color: var(--deep-blue); margin: 0 0 8px; font-size: 23px; font-weight: 700; }
+        .step-subtitle { color: var(--text-light); margin: 0 0 24px; font-size: 15px; line-height: 1.5; }
+        .form-group { margin-bottom: 22px; }
+        label { display: block; margin-bottom: 7px; font-weight: 600; font-size: 14px; color: var(--deep-blue); }
+        input[type="text"], select, textarea {
+            width: 100%; padding: 13px 15px; border: 2px solid var(--border-color);
+            border-radius: 10px; font-size: 15px; font-family: inherit; outline: none;
+            background: #fafcfd; transition: var(--transition); color: var(--text-color);
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary-blue); background: #fff; box-shadow: 0 0 0 3px rgba(11,95,165,0.06); }
+        textarea { resize: vertical; min-height: 90px; }
+        .rating, .mini-rating { display: flex; flex-direction: row-reverse; justify-content: flex-start; gap: 6px; }
+        .rating input, .mini-rating input { display: none; }
+        .rating label, .mini-rating label { font-size: 36px; color: #ccd6e0; cursor: pointer; transition: color 0.2s, transform 0.2s; margin: 0; line-height: 1; }
+        .mini-rating label { font-size: 26px; }
+        .rating input:checked~label, .rating label:hover~label, .rating label:hover,
+        .mini-rating input:checked~label, .mini-rating label:hover~label, .mini-rating label:hover { color: #f5b342; }
+        .question-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 15px; flex-wrap: wrap; }
+        .question-label { font-weight: 600; font-size: 15px; color: var(--text-color); flex: 1 1 200px; }
+        .btn-group { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; gap: 12px; }
+        button { padding: 13px 28px; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; transition: all 0.25s; }
+        .btn-next { background: var(--primary-blue); color: #fff; flex: 1; box-shadow: 0 3px 12px rgba(11,95,165,0.25); }
+        .btn-next:hover { background: #094a80; transform: translateY(-1px); }
+        .btn-back { background: #fff; color: var(--text-light); border: 2px solid #dce3ec; padding: 11px 24px; }
+        .btn-back:hover { background: #f5f7fa; border-color: #bcc9d8; }
+        .final-screen { text-align: center; }
+        .final-icon { font-size: 54px; margin-bottom: 10px; }
+        .gis-box { background: #f9fbfd; border: 2px dashed var(--accent-green); padding: 22px 18px; border-radius: 12px; margin: 20px 0; text-align: left; position: relative; }
+        .gis-box::before { content: '📝 Ваш отзыв'; position: absolute; top: -12px; left: 18px; background: #fff; padding: 0 8px; font-size: 13px; font-weight: 700; color: var(--accent-green); }
+        #preparedReview { font-style: italic; color: #2a3d4f; line-height: 1.6; margin: 6px 0 16px; font-size: 15px; background: #fff; padding: 14px; border-radius: 8px; border: 1px solid #e3eaf2; white-space: pre-wrap; }
+        .copy-btn { background: var(--accent-green); color: white; width: 100%; margin-bottom: 8px; font-weight: 600; box-shadow: 0 3px 10px rgba(46,125,50,0.2); }
+        .copy-btn:hover { background: #256b29; }
+        .map-buttons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 18px 0; }
+        .map-link {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 14px 24px; border-radius: 10px; font-weight: 700; font-size: 16px;
+            text-decoration: none; transition: all 0.25s; box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+            flex: 1 1 auto; min-width: 160px;
+        }
+        .map-link.ya { background: #ffcc00; color: #000; }
+        .map-link.ya:hover { background: #f0b800; transform: translateY(-2px); }
+        .map-link.two-gis { background: #1565c0; color: white; }
+        .map-link.two-gis:hover { background: #0d47a1; transform: translateY(-2px); }
+        .small-note { font-size: 13px; color: var(--text-light); margin-top: 18px; }
+        @media (max-width: 500px) { .survey-container { padding: 24px 16px 22px; } .question-row { flex-direction: column; align-items: flex-start; gap: 6px; } .rating label { font-size: 32px; } .mini-rating label { font-size: 24px; } }
+    </style>
+</head>
+<body>
+    <!-- Модальное окно согласия -->
+    <div class="modal-overlay" id="consentModal">
+        <div class="modal-content">
+            <h2>📋 Согласие на участие в опросе</h2>
+            <div class="modal-text">
+                <p><strong>Пользовательское соглашение</strong></p>
+                <p>Данный опрос создан для сбора отзывов о работе компании «Адванта-М Сибирь». Участие является полностью добровольным и анонимным в той мере, в какой вы сами решите указать своё имя.</p>
+                <p><strong>Какие данные собираются:</strong> имя (как вы представитесь), город, информация о приобретённой технике, ваши оценки и текстовый отзыв.</p>
+                <p><strong>Цели обработки:</strong> формирование текста отзыва, который вы сможете самостоятельно опубликовать на 2ГИС или Яндекс.Картах; улучшение качества обслуживания в компании.</p>
+                <p>Ваши данные не будут передаваться третьим лицам, использоваться для рекламы или иных целей, кроме указанных. Вся информация хранится локально в вашем браузере и не отправляется на сервер без вашего отдельного разрешения.</p>
+                <p>Нажимая «Принимаю», вы даёте согласие на обработку указанной информации на условиях настоящего соглашения. Если вы не согласны, просто закройте страницу.</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-reject" id="rejectConsent">Отказываюсь</button>
+                <button class="btn-accept" id="acceptConsent">Принимаю</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной опрос (изначально скрыт) -->
+    <div class="survey-container" id="surveyContainer">
+        <div class="brand-stripe"></div>
+        <div class="progress-wrap"><div class="progress-bar" id="progress"></div></div>
+        <form id="multiStepForm" onsubmit="return false;">
+            <!-- Шаг 1 -->
+            <div class="step active" id="step1">
+                <h2>👋 Давайте познакомимся</h2>
+                <p class="step-subtitle">Представьтесь, пожалуйста, — мы ценим каждого клиента.</p>
+                <div class="form-group"><label>Как вас зовут?</label><input type="text" id="userName" placeholder="Иван Петров" required></div>
+                <button type="button" class="btn-next" onclick="nextStep(2)">Продолжить →</button>
+            </div>
+            <!-- Шаг 2: каскадные списки + город -->
+            <div class="step" id="step2">
+                <h2>🛒 Что вы приобрели?</h2>
+                <p class="step-subtitle">Выберите категорию, город и поставьте общую оценку.</p>
+                <div class="form-group"><label>Глобальная категория</label><select id="globalCat"></select></div>
+                <div class="form-group" id="subCatGroup" style="display:none;"><label>Подкатегория</label><select id="subCat"></select></div>
+                <div class="form-group" id="subTypeGroup" style="display:none;"><label>Уточнение (необязательно)</label><select id="subType"><option value="">Не уточнять</option></select></div>
+                <div class="form-group">
+                    <label>Ваш город</label>
+                    <select id="userCity">
+                        <option value="">-- Выберите город --</option>
+                        <option value="novosibirsk">Новосибирск</option>
+                        <option value="omsk">Омск</option>
+                        <option value="krasnoyarsk">Красноярск</option>
+                        <option value="irkutsk">Иркутск</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Общая оценка компании</label><div class="rating" id="overallRating"></div></div>
+                <div class="btn-group">
+                    <button type="button" class="btn-back" onclick="nextStep(1)">← Назад</button>
+                    <button type="button" class="btn-next" onclick="nextStep(3)">Далее →</button>
+                </div>
+            </div>
+            <!-- Шаг 3: вопросы -->
+            <div class="step" id="step3">
+                <h2>📋 Детали заказа</h2>
+                <p class="step-subtitle">Оцените ключевые моменты (1–5 звёзд) и добавьте комментарий.</p>
+                <div id="dynamicQuestions" class="form-group"></div>
+                <div class="form-group"><label>Ваш комментарий (необязательно)</label><textarea id="reviewText" rows="3" placeholder="Поделитесь впечатлениями..."></textarea></div>
+                <div class="btn-group">
+                    <button type="button" class="btn-back" onclick="nextStep(2)">← Назад</button>
+                    <button type="button" class="btn-next" onclick="finishSurvey()">✨ Собрать отзыв</button>
+                </div>
+            </div>
+            <!-- Финал -->
+            <div class="step final-screen" id="stepFinal">
+                <div class="final-icon">🎉</div>
+                <h2>Спасибо за ваш отзыв!</h2>
+                <p class="step-subtitle">Продублируйте отзыв на картах — текст уже готов.</p>
+                <div class="gis-box">
+                    <p id="preparedReview">Здесь появится ваш отзыв...</p>
+                    <button type="button" class="copy-btn" onclick="copyReview()">📋 Скопировать текст отзыва</button>
+                </div>
+                <p style="margin:18px 0 8px;">Выберите удобную площадку для публикации:</p>
+                <div class="map-buttons">
+                    <a id="twoGisLink" href="#" target="_blank" class="map-link two-gis" rel="noopener">⭐ 2ГИС</a>
+                    <a id="yandexLink" href="#" target="_blank" class="map-link ya" rel="noopener">📍 Яндекс.Карты</a>
+                </div>
+                <p class="small-note">Кнопки откроются в новой вкладке. Вставьте скопированный текст в поле отзыва.</p>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        (() => {
+            // --- Согласие ---
+            const modal = document.getElementById('consentModal');
+            const survey = document.getElementById('surveyContainer');
+            document.getElementById('acceptConsent').addEventListener('click', () => {
+                modal.style.display = 'none';
+                survey.classList.add('visible');
+                initSurvey();
+            });
+            document.getElementById('rejectConsent').addEventListener('click', () => {
+                alert('Вы отказались от участия в опросе. Страница будет закрыта.');
+                window.close();
+                document.body.innerHTML = '<div style="text-align:center; padding-top:100px;"><h2>Вы отказались от участия в опросе.</h2></div>';
+            });
+
+            function initSurvey() {
+                const categoryTree = {
+                    'Складская техника': {
+                        'Ручные гидравлические рохли': ['стандартные','с весами и принтером','с короткими вилами','с длинными вилами','с подъемным механизмом','из нержавеющей стали'],
+                        'Ручные тележки': ['платформенные','двухколесные'],
+                        'Самоходные электротележки': [],
+                        'Штабелеры': ['ручные','самоходные','электрические'],
+                        'Ричтраки, комплектовщики': [],
+                        'Подъемные столы': ['электрические','гидравлические'],
+                        'Вилочные погрузчики': ['дизельные','бензиновые','электрические'],
+                        'Строительные подъемники': ['ножничные','ножничные гусеничные','ножничные самоходные','ножничные дизельные','запчасти'],
+                        'Телескопические подъемники': ['одномощные одноместные','двухмощные двуместные','самоходные электрические','несамоходные']
+                    },
+                    'Строительная техника': {
+                        'Коленчатые подъемники': ['электрические','дизельные','самоходные'],
+                        'Строительные фасадные люльки': ['запчасти'],
+                        'Виброплиты, вибротрамбовки, виброрейки': []
+                    },
+                    'Колёса и колёсные опоры': {
+                        'По назначению': ['промышленные','аппаратные','полиуретановые','большегрузные','нейлоновые','термостойкие','ролики и рулевые колеса','пневматические','пенополиуретановые'],
+                        'По применению': ['для платформенных тележек','контейнеров','печей','большегрузных тележек','торгового оборудования','вышек тур','штабелеров','тягачей','ричтраков','комплектовщиков']
+                    },
+                    'Грузоподъёмное оборудование': {
+                        'Лебёдки': ['ручные','электрические','автомобильные'],
+                        'Тали': ['ручные','цепные','рычажные','электрические'],
+                        'Стропы': [],
+                        'Запчасти (весы, блоки, домкраты)': [],
+                        'Тележки такелажные': []
+                    }
+                };
+                const links2GIS = {
+                    novosibirsk: 'https://2gis.ru/novosibirsk/firm/70000001039912196',
+                    omsk: 'https://2gis.ru/omsk/firm/70000001052356244/tab/reviews',
+                    krasnoyarsk: 'https://2gis.ru/krasnoyarsk/firm/70000001046072752/tab/reviews',
+                    irkutsk: 'https://2gis.ru/irkutsk/firm/70000001099169402/tab/reviews'
+                };
+                const linksYandex = {
+                    novosibirsk: 'https://yandex.ru/maps/-/CPGiyIKw',
+                    omsk: 'https://yandex.ru/maps/org/advanta_m_sibir/41724920768/',
+                    krasnoyarsk: 'https://yandex.ru/maps/org/advanta_m_sibir_v_krasnoyarske/139390224694/',
+                    irkutsk: 'https://yandex.ru/maps/org/advanta_m_sibir/239306524841/'
+                };
+                const questionsMap = {
+                    'Ручные гидравлические рохли': [
+                        'Грузоподъёмность соответствует заявленной',
+                        'Качество гидравлики',
+                        'Прочность вил',
+                        'Манёвренность',
+                        'Скорость доставки',
+                        'Упаковка и сохранность',
+                        'Консультация менеджера'
+                    ],
+                    'Ручные тележки': [
+                        'Грузоподъёмность и устойчивость',
+                        'Удобство рукоятки',
+                        'Качество колёс',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Помощь в выборе'
+                    ],
+                    'Самоходные электротележки': [
+                        'Запас хода',
+                        'Грузоподъёмность',
+                        'Надёжность электроники',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Консультация'
+                    ],
+                    'Штабелеры': [
+                        'Грузоподъёмность и высота подъёма',
+                        'Работа гидравлики / электропривода',
+                        'Устойчивость',
+                        'Качество сборки',
+                        'Скорость доставки',
+                        'Упаковка'
+                    ],
+                    'Ричтраки, комплектовщики': [
+                        'Точность позиционирования',
+                        'Грузоподъёмность и высота',
+                        'Надёжность ходовой части',
+                        'Скорость доставки',
+                        'Помощь в подборе',
+                        'Упаковка'
+                    ],
+                    'Подъемные столы': [
+                        'Грузоподъёмность и высота',
+                        'Работа гидравлики / электропривода',
+                        'Устойчивость',
+                        'Качество изготовления',
+                        'Скорость доставки',
+                        'Упаковка'
+                    ],
+                    'Вилочные погрузчики': [
+                        'Грузоподъёмность',
+                        'Тип двигателя и мощность',
+                        'Качество сборки',
+                        'Удобство управления',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Консультация'
+                    ],
+                    'Строительные подъемники': [
+                        'Грузоподъёмность и рабочая высота',
+                        'Привод и надёжность',
+                        'Устойчивость',
+                        'Качество изготовления',
+                        'Скорость доставки',
+                        'Упаковка'
+                    ],
+                    'Телескопические подъемники': [
+                        'Высота подъёма',
+                        'Двигатель и расход',
+                        'Устойчивость',
+                        'Качество сборки',
+                        'Скорость доставки',
+                        'Консультация'
+                    ],
+                    'Коленчатые подъемники': [
+                        'Рабочая высота',
+                        'Привод и надёжность',
+                        'Устойчивость',
+                        'Качество гидравлики',
+                        'Скорость доставки',
+                        'Упаковка'
+                    ],
+                    'Строительные фасадные люльки': [
+                        'Грузоподъёмность',
+                        'Надёжность механизма',
+                        'Удобство монтажа',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Наличие запчастей'
+                    ],
+                    'Виброплиты, вибротрамбовки, виброрейки': [
+                        'Мощность и производительность',
+                        'Качество вибрации',
+                        'Транспортировка',
+                        'Скорость доставки',
+                        'Упаковка'
+                    ],
+                    'По назначению': [
+                        'Соответствие типу',
+                        'Качество материалов',
+                        'Точность размеров',
+                        'Надёжность подшипников',
+                        'Упаковка и сохранность',
+                        'Консультация'
+                    ],
+                    'По применению': [
+                        'Подходят к технике',
+                        'Качество и износостойкость',
+                        'Точность размеров',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Помощь менеджера'
+                    ],
+                    'Лебёдки': [
+                        'Тяговое усилие',
+                        'Привод и надёжность',
+                        'Качество сборки',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Консультация'
+                    ],
+                    'Тали': [
+                        'Грузоподъёмность',
+                        'Тип механизма',
+                        'Качество изготовления',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Помощь в выборе'
+                    ],
+                    'Стропы': [
+                        'Длина и грузоподъёмность',
+                        'Материал и прочность',
+                        'Сертификация',
+                        'Скорость доставки',
+                        'Упаковка'
+                    ],
+                    'Запчасти (весы, блоки, домкраты)': [
+                        'Совместимость',
+                        'Качество деталей',
+                        'Скорость обработки',
+                        'Упаковка',
+                        'Помощь в подборе'
+                    ],
+                    'Тележки такелажные': [
+                        'Грузоподъёмность',
+                        'Качество колёс',
+                        'Скорость доставки',
+                        'Упаковка',
+                        'Консультация'
+                    ]
+                };
+
+                const globalSelect = document.getElementById('globalCat');
+                const subCatSelect = document.getElementById('subCat');
+                const subTypeSelect = document.getElementById('subType');
+                const subCatGroup = document.getElementById('subCatGroup');
+                const subTypeGroup = document.getElementById('subTypeGroup');
+                const overallContainer = document.getElementById('overallRating');
+                const dynamicQuestions = document.getElementById('dynamicQuestions');
+                const twoGisLink = document.getElementById('twoGisLink');
+                const yandexLink = document.getElementById('yandexLink');
+
+                function populateGlobal() {
+                    globalSelect.innerHTML = '<option value="">-- Выберите категорию --</option>';
+                    Object.keys(categoryTree).forEach(cat => {
+                        const opt = document.createElement('option');
+                        opt.value = cat; opt.textContent = cat;
+                        globalSelect.appendChild(opt);
+                    });
+                    globalSelect.addEventListener('change', onGlobalChange);
+                }
+                function onGlobalChange() {
+                    const selected = globalSelect.value;
+                    subCatSelect.innerHTML = '<option value="">-- Выберите подкатегорию --</option>';
+                    subTypeSelect.innerHTML = '<option value="">Не уточнять</option>';
+                    subCatGroup.style.display = 'none';
+                    subTypeGroup.style.display = 'none';
+                    if (!selected) return;
+                    Object.keys(categoryTree[selected]).forEach(sub => {
+                        const opt = document.createElement('option');
+                        opt.value = sub; opt.textContent = sub;
+                        subCatSelect.appendChild(opt);
+                    });
+                    subCatGroup.style.display = 'block';
+                    subCatSelect.addEventListener('change', onSubCatChange);
+                }
+                function onSubCatChange() {
+                    const global = globalSelect.value;
+                    const sub = subCatSelect.value;
+                    subTypeSelect.innerHTML = '<option value="">Не уточнять</option>';
+                    subTypeGroup.style.display = 'none';
+                    if (!global || !sub) return;
+                    const subtypes = categoryTree[global][sub];
+                    if (subtypes && subtypes.length > 0) {
+                        subtypes.forEach(st => {
+                            const opt = document.createElement('option');
+                            opt.value = st; opt.textContent = st;
+                            subTypeSelect.appendChild(opt);
+                        });
+                        subTypeGroup.style.display = 'block';
+                    }
+                }
+
+                function buildStarRating(container, name, mini = false) {
+                    container.innerHTML = '';
+                    container.className = mini ? 'mini-rating' : 'rating';
+                    for (let i = 5; i >= 1; i--) {
+                        const input = document.createElement('input');
+                        input.type = 'radio'; input.name = name; input.value = i;
+                        input.id = `${name}_${i}`;
+                        const label = document.createElement('label');
+                        label.htmlFor = input.id; label.textContent = '★'; label.title = i + ' из 5';
+                        container.appendChild(input);
+                        container.appendChild(label);
+                    }
+                }
+                function renderQuestions(subCategory) {
+                    dynamicQuestions.innerHTML = '';
+                    const questions = questionsMap[subCategory] || [
+                        'Качество товара', 'Соответствие ожиданиям', 'Скорость доставки',
+                        'Упаковка и сохранность', 'Работа менеджера', 'Общее удобство покупки'
+                    ];
+                    questions.forEach((q, idx) => {
+                        const row = document.createElement('div');
+                        row.className = 'question-row';
+                        const labelSpan = document.createElement('span');
+                        labelSpan.className = 'question-label';
+                        labelSpan.textContent = q;
+                        const ratingDiv = document.createElement('div');
+                        buildStarRating(ratingDiv, `catQ_${idx}`, true);
+                        row.appendChild(labelSpan);
+                        row.appendChild(ratingDiv);
+                        dynamicQuestions.appendChild(row);
+                    });
+                }
+
+                buildStarRating(overallContainer, 'overallStar');
+                populateGlobal();
+
+                window.nextStep = function(step) {
+                    if (step === 2) {
+                        const name = document.getElementById('userName').value.trim();
+                        if (!name) { alert('⚠️ Введите имя'); return; }
+                    }
+                    if (step === 3) {
+                        const global = globalSelect.value;
+                        const sub = subCatSelect.value;
+                        const city = document.getElementById('userCity').value;
+                        if (!global || !sub) { alert('⚠️ Выберите категорию и подкатегорию'); return; }
+                        if (!city) { alert('⚠️ Выберите ваш город'); return; }
+                        if (!document.querySelector('input[name="overallStar"]:checked')) {
+                            alert('⚠️ Поставьте общую оценку'); return;
+                        }
+                        renderQuestions(sub);
+                    }
+                    if (step === 'Final') {
+                        const city = document.getElementById('userCity').value;
+                        twoGisLink.href = links2GIS[city] || '#';
+                        yandexLink.href = linksYandex[city] || '#';
+                    }
+                    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+                    const target = document.getElementById(step === 'Final' ? 'stepFinal' : 'step' + step);
+                    if (target) target.classList.add('active');
+                    const progress = document.getElementById('progress');
+                    const map = { 1: '25%', 2: '50%', 3: '75%', 'Final': '100%' };
+                    if (progress && map[step]) progress.style.width = map[step];
+                    document.querySelector('.survey-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+
+                window.finishSurvey = function() {
+                    const name = document.getElementById('userName').value.trim() || 'Клиент';
+                    const global = globalSelect.value;
+                    const sub = subCatSelect.value;
+                    const subtype = subTypeSelect.value;
+                    const comment = document.getElementById('reviewText').value.trim();
+                    const overallVal = parseInt(document.querySelector('input[name="overallStar"]:checked')?.value || 5);
+                    let productDesc = sub;
+                    if (subtype) productDesc += ` (${subtype})`;
+                    productDesc += ` / ${global}`;
+
+                    const rows = dynamicQuestions.querySelectorAll('.question-row');
+                    const details = [];
+                    rows.forEach(row => {
+                        const q = row.querySelector('.question-label')?.textContent || '';
+                        const checked = row.querySelector('input[type="radio"]:checked');
+                        if (checked) {
+                            const v = parseInt(checked.value);
+                            details.push(`${q}: ${'⭐'.repeat(v)} (${v}/5)`);
+                        } else {
+                            details.push(`${q}: не оценено`);
+                        }
+                    });
+
+                    let review = `Покупал в компании «Адванта-М Сибирь»: ${productDesc}.\n`;
+                    review += `Общая оценка: ${'⭐'.repeat(overallVal)} (${overallVal}/5).\n`;
+                    if (details.length) review += `Детали заказа:\n${details.map(d => '• ' + d).join('\n')}\n`;
+                    if (comment) review += `\nМой комментарий: ${comment}`;
+
+                    document.getElementById('preparedReview').textContent = review;
+                    nextStep('Final');
+                };
+
+                window.copyReview = function() {
+                    const text = document.getElementById('preparedReview')?.textContent || '';
+                    if (!text.trim() || text.includes('Здесь появится')) {
+                        alert('Сначала соберите отзыв');
+                        return;
+                    }
+                    // Универсальное копирование через временный textarea
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        const btn = document.querySelector('.copy-btn');
+                        const orig = btn.textContent;
+                        btn.textContent = '✅ Скопировано!';
+                        btn.style.background = '#1b5e20';
+                        setTimeout(() => {
+                            btn.textContent = orig;
+                            btn.style.background = '';
+                        }, 1800);
+                    } catch (err) {
+                        alert('Не удалось скопировать. Попробуйте выделить текст вручную и нажать Ctrl+C.');
+                    } finally {
+                        document.body.removeChild(textarea);
+                    }
+                };
+            }
+        })();
+    </script>
+</body>
+</html>
